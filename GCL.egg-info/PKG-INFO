@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: GCL
+Version: 1.0.0
+Summary: Joint Generative and Contrastive Learning for Unsupervised Person Re-identification
+Home-page: https://github.com/chenhao2345/GCL
+Author: Hao Chen
+Author-email: hao.chen@inria.fr
+License: UNKNOWN
+Keywords: Novel View SynthesisContrastive Learning,Unsupervised Person Re-identification
+Platform: UNKNOWN
+License-File: LICENSE
+
+UNKNOWN
+

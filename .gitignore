@@ -1,0 +1,9 @@
+examples/logs/
+*.pth
+examples/data/
+examples/mesh/
+logs/
+outputs/
+
+__pycache__/
+*.pyc

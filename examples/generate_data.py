@@ -198,8 +198,8 @@ def main():
 
     # display set
     train_display_loader = get_display_loader(dataset_target, args.height, args.width, args.batch_size, args.workers, testset=dataset_target.train, mesh_dir=args.mesh_dir)
-    # train_display_loader = get_display_loader(dataset_target, args.height, args.width, args.batch_size, args.workers,
-    #                                           mesh_dir=args.mesh_dir)
+    #train_display_loader = get_query_loader(dataset_target, args.height, args.width, args.batch_size, args.workers, mesh_dir=args.mesh_dir)
+    #train_display_loader = get_display_loader(dataset_target, args.height, args.width, args.batch_size, args.workers, mesh_dir=args.mesh_dir)
 
     # generate data
     if args.mode == 'recon':

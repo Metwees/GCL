@@ -309,6 +309,7 @@ def main_worker(args):
             if args.stage == 2:
                 if (iterations + 1) % config['snapshot_save_iter'] == 0:
                     trainer.module.save(checkpoint_directory, iterations)
+                    
 
         if (args.stage==3):
             trainer.module.update_learning_rate()
@@ -375,5 +376,5 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='configs/latest.yaml', help='Path to the config file.')
     parser.add_argument('--output_path', type=str, default='.', help="outputs path")
     parser.add_argument('--name', type=str, default='latest', help="outputs path")
-
+    
     main()

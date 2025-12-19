@@ -173,6 +173,10 @@ class DGNet_Trainer(nn.Module):
         s_nv = self.gen.encode(x_mesh_nv)
         feat = self.id_net(x_img, mode='display')
 
+
+        #print("s_nv:", s_nv.shape)
+        #print("feat:", feat.shape)
+
         # decode
         x_nv = self.gen.decode(s_nv, feat)
         return x_nv
