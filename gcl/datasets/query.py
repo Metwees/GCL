@@ -25,7 +25,7 @@ def collect_gan_images(
     #for path, pid, camid in original_list:
     for i, (path, pid, camid) in enumerate(original_list):
         if i % 500 == 0:
-            print(f"[GAN] Processed {i}/{len(original_list)*len(angles)} images")
+            print(f"[GAN] Processed {i}/{len(original_list)} images")
         
         filename = osp.basename(path)
 

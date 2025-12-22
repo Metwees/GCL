@@ -187,8 +187,8 @@ def evaluate_all(distmat, query_ids, gallery_ids, query_cams, gallery_cams, cmc_
               .format(k,
                       cmc_scores['market1501'][k-1]))
     return cmc_scores, mAP
-
 '''
+
 def pairwise_distance(features, query=None, gallery=None):
     if query is None and gallery is None:
         n = len(features)

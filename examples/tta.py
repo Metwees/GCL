@@ -370,8 +370,6 @@ def main():
         queryGANPaths, queryGANIds, queryGANCams, gan_query_list = collect_gan_images(dataset_target.query,gan_root=save_path_query)
         print("\n[COLLECTING GALLERY GAN INFORMATION]\n")
         galleryGANPaths, galleryGANIds, galleryGANCams, gan_gallery_list = collect_gan_images(dataset_target.gallery,gan_root=save_path_gallery)
-
-      
        
         if lf:
             print("\n[LOADING SAVED FEATURES]\n")
@@ -460,7 +458,7 @@ def main():
 
         print("Ranker creato")
         dist_mat = np.zeros((N, M, 5))
-        weight = np.ones(1 + len(ANGLES))
+        weight = np.array([1.0] + [0.2] * len(ANGLES))
         
         for index in range(N):
             print("evaluating image " + str(index) + " using " + method + " method ")
