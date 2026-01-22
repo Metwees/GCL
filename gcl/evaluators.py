@@ -61,6 +61,7 @@ def _unique_sample(ids_dict, num):
     return mask
 
 
+
 def cmc(distmat, query_ids=None, gallery_ids=None,
         query_cams=None, gallery_cams=None, topk=100,
         separate_camera_set=False,
@@ -260,4 +261,4 @@ class Evaluator(object):
         distmat_gg = pairwise_distance(features, gallery, gallery)
         distmat = re_ranking(distmat.numpy(), distmat_qq.numpy(), distmat_gg.numpy())
         return evaluate_all(query_features, gallery_features, distmat, query=query, gallery=gallery, cmc_flag=cmc_flag)
-'''
+        '''

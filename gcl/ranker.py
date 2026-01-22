@@ -42,7 +42,7 @@ class Ranker:
         - queries: np.ndarray (K, D)
         - weight:  None oppure array di shape (K,) con pesi per le query
         """
-        print("QE")
+        #print("QE")
         if "center" not in self.method:
             distances = self.get_weighted_distance(self.gallery, queries, weight)  # (N, K)
             if "min" in self.method:
@@ -68,7 +68,7 @@ class Ranker:
         - extGallery:  (N_gallery, M, D) M espansioni/varianti per ciascun item di gallery
         - weight:      None oppure (K,) pesi per le query
         """
-        print("GQE")
+        #print("GQE")
         if "center" not in self.method:
             # calculate the distances between queries and gallery
             distance = self.get_weighted_distance(self.gallery, queries, weight)  # (N, K)
@@ -76,7 +76,7 @@ class Ranker:
             for i in range(np.shape(extGallery)[1]):
                 distance = self.get_weighted_distance(extGallery[:,i,:], queries, weight)
                 distances = np.concatenate((distances, np.expand_dims(distance, axis=0)),  axis=0)
-            print(np.shape(distances))
+            #print(np.shape(distances))
             
             if "min" in self.method:
                 # Best tra le espansioni e tra le query
@@ -89,7 +89,7 @@ class Ranker:
                     distance = distances_over_gallery.sum(axis=1)  # (N,)
                 else:
                     distance = distances_over_gallery.mean(axis=1)  # (N,)(axis=1)
-            print(np.shape(distance))
+            #print(np.shape(distance))
         else:
             if weight is None:
                 mean_query = np.mean(queries, axis=0)

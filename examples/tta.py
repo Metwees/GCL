@@ -30,7 +30,8 @@ from gcl.ranker import Ranker
 start_epoch = best_mAP = 0
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-method = 'min' # 'avg', 'center'
+#method = 'min' # 'avg', 'center'
+method = 'min'
 ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
 
 
@@ -228,30 +229,40 @@ def main():
     cudnn.benchmark = True
 
     config = get_config(args.config)
+    print("==========\nArgs:{}\n==========".format(args))
+
 
     # loading model
     print('==> loading model')
     if args.dataset_target == 'market1501':
-        checkpoint_path = 'outputs/market_init_JVTC_unsupervised/checkpoints'
+        #checkpoint_path = 'outputs/market_init_JVTC_unsupervised/checkpoints'
+        checkpoint_path = 'outputs/duke_init_JVTC_unsupervised/checkpoints'
+
         model_1 = create_model(args)
         trainer = DGNet_Trainer(config, model_1, args.idnet_fix).cuda()
         iterations = trainer.resume(checkpoint_path, hyperparameters=config)
+        #iterations = 0
         output_path = 'outputs/market_init_JVTC_unsupervised/images'
         os.makedirs(output_path, exist_ok=True)
+        feat_path = 'outputs/market_init_JVTC_unsupervised/feat'
     elif args.dataset_target == 'dukemtmc-reid':
         checkpoint_path = 'outputs/duke_init_JVTC_unsupervised/checkpoints'
         model_1 = create_model(args)
         trainer = DGNet_Trainer(config, model_1, args.idnet_fix).cuda()
         iterations = trainer.resume(checkpoint_path, hyperparameters=config)
+        #iterations = 0
         output_path = 'outputs/duke_init_JVTC_unsupervised/images'
         os.makedirs(output_path, exist_ok=True)
+        feat_path = 'outputs/duke_init_JVTC_unsupervised/feat'
     elif args.dataset_target == 'msmt17':
         checkpoint_path = 'outputs/msmt_init_JVTC_unsupervised/checkpoints'
         model_1 = create_model(args)
         trainer = DGNet_Trainer(config, model_1, args.idnet_fix).cuda()
         iterations = trainer.resume(checkpoint_path, hyperparameters=config)
+        #iterations = 0
         output_path = 'outputs/msmt_init_JVTC_unsupervised/images'
         os.makedirs(output_path, exist_ok=True)
+        feat_path = 'outputs/msmt_init_JVTC_unsupervised/feat'
     else:
         raise NotImplementedError
 
@@ -295,7 +306,6 @@ def main():
         print('\n===============NESSUNA IMMAGINE GENERATA=================\n')
         
         #(galleryCams, galleryDescriptors, galleryIds, galleryPaths, queryCams, queryDescriptors, queryIds, queryPaths) 
-        feat_path = 'outputs/duke_init_JVTC_unsupervised/feat'
         os.makedirs(feat_path, exist_ok=True)
         #local feature
         lf = args.lf
@@ -308,7 +318,6 @@ def main():
             except Exception as e:
                 print(f"Error loading query features: {e}")
                 raise
-
             try:
                 with open(os.path.join(feat_path, "galleryFeatures.pkl"), "rb") as f:
                     galleryFeatures = pickle.load(f)
@@ -394,6 +403,9 @@ def main():
             gan_query_loader = get_GAN_loader(gan_query_list, args.height, args.width, args.batch_size, args.workers)
             gan_gallery_loader = get_GAN_loader(gan_gallery_list, args.height, args.width, args.batch_size, args.workers)
 
+            assert len(gan_query_loader.dataset) == len(gan_query_list)
+            assert len(gan_gallery_loader.dataset) == len(gan_gallery_list) 
+            
             print("[QUERY GAN EXTRACTION]\n")
             gan_feats_query, _ = extract_features(trainer.id_net, gan_query_loader)
             print("Query estratte correttamente\n")
@@ -452,17 +464,19 @@ def main():
         print("  cams: ", len(queryGANCams))
         print("  descriptors:", queryGANDescriptors.shape)
 
+        print('\n\n')
+
         separate_camera_set = args.separate
         #separate_camera_set = True
         ranker = Ranker(galleryDescriptors, galleryCams, method, separate_camera_set)
 
-        print("Ranker creato")
+        #print("Ranker creato")
         dist_mat = np.zeros((N, M, 5))
         weight = np.array([1.0] + [0.2] * len(ANGLES))
         
-        for index in range(N):
-            print("evaluating image " + str(index) + " using " + method + " method ")
-            print(queryPaths[index])
+        for index in tqdm(range(N)):
+            #print("evaluating image " + str(index) + " using " + method + " method ")
+            #print(queryPaths[index])
             #print(queryGANPaths[index,:])
             queryDescriptor = queryDescriptors[index,:]
 
@@ -494,6 +508,8 @@ def main():
             print('\nSeparate camera set\n')
         else:
             print('\nNot separate camera set\n')
+
+        print(method)
 
         for k, name in enumerate(names):
             print(f"\n=== {name} ===")
