@@ -26,12 +26,13 @@ from torchvision import utils
 from tqdm import tqdm
 from gcl.evaluators import extract_features
 from gcl.ranker import Ranker
+from gcl.utils.features import select_topk_expansions
 
 start_epoch = best_mAP = 0
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 #method = 'min' # 'avg', 'center'
-method = 'min'
+method = 'center'
 ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
 
 
@@ -185,10 +186,22 @@ def generate_nv(trainer, mesh_loader, query, output_path):
         dest_path = os.path.join(output_path, "nv", "0", os.path.basename(orig_path))
 
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        shutil.copy(orig_path, dest_path)
+        #shutil.copy(orig_path, dest_path)
 
         # copia dell'immagine originale
-        shutil.copy(orig_path, dest_path)
+        #shutil.copy(orig_path, dest_path)
+        img = img.cuda()
+        mesh_org = mesh_org.cuda()
+
+        img_nv = trainer.sample_nv(img, mesh_org)
+        img_nv = denormalize_recon(img_nv)
+
+        utils.save_image(
+            img_nv,
+            dest_path,
+            normalize=True,
+            range=(0, 1.0),
+        )
 
         for j in [45, 90, 135, 180, 225, 270, 315]:
             idx = int(j / 45 - 1)
@@ -470,10 +483,40 @@ def main():
         #separate_camera_set = True
         ranker = Ranker(galleryDescriptors, galleryCams, method, separate_camera_set)
 
-        #print("Ranker creato")
+        K = 3
+        _, _, D = galleryGANDescriptors.shape
+        filteredGalleryDescriptors = np.zeros((M, D))
+        filteredGalleryGANDescriptors = np.zeros((M, K, D))
+        indexGanSaved = np.zeros((M,K),dtype=np.int64)
+        distGanSaved = np.zeros((M,K))
+
+        for i in range(M):
+            #filteredGalleryGANDescriptors[i], indexGanSaved[i] = select_topk_expansions(galleryDescriptors[i],galleryGANDescriptors[i],k=K)
+            #filteredGalleryGANDescriptors[i] = filteredGalleryGANDescriptors[i].mean(axis=0)
+            topk_feats, topk_idx, topk_dist = select_topk_expansions(galleryDescriptors[i],galleryGANDescriptors[i],k=K)
+
+            filteredGalleryGANDescriptors[i] = topk_feats      
+            indexGanSaved[i] = topk_idx                    
+            distGanSaved[i] = topk_dist     
+            filteredGalleryDescriptors[i] = topk_feats.mean(axis=0)
+
+        for i in range(3):
+            print(f"Image {i}:")
+            for j, idx in enumerate(indexGanSaved[i]):
+                angle = ANGLES[idx]
+                dist  = distGanSaved[i][j]
+                print(f"  rank {j+1}: angle = {angle:>3}°, dist = {dist:.4f}")
+            print()
+
         dist_mat = np.zeros((N, M, 5))
-        weight = np.array([1.0] + [0.2] * len(ANGLES))
-        
+        #weight = np.array([1.0] + [0.2] * len(ANGLES))
+        #weight = np.array([1.0] + [0.2] * K)
+
+        eps = 1e-6
+        gan_weights = 1.0 / (topk_dist + eps)
+        weight = np.concatenate(([1.0], gan_weights))
+        weight = weight / weight.sum()
+
         for index in tqdm(range(N)):
             #print("evaluating image " + str(index) + " using " + method + " method ")
             #print(queryPaths[index])
@@ -485,7 +528,12 @@ def main():
             [distances, rank] = ranker.get_dist_rank(queryDescriptors[index,:], queryCams[index])
             dist_mat[index,:,0] = distances
 
-            queryDescriptorQE = np.concatenate((np.expand_dims(queryDescriptor,axis=0),np.squeeze(queryGANDescriptors[index, :, :])))
+            #Calcola la distanza tra l'immagine originale e le immagini generate e prende le tre piu' vicine
+            filteredQueryGan, _, _ = select_topk_expansions(queryDescriptors[index],queryGANDescriptors[index],k=3)
+
+            queryDescriptorQE = np.concatenate((queryDescriptors[index][None, :], filteredQueryGan),axis=0)
+
+            #queryDescriptorQE = np.concatenate((np.expand_dims(queryDescriptor,axis=0),np.squeeze(queryGANDescriptors[index, :, :])))
 
             #Con expansion della sola query
             [distances, rank] = ranker.QE(queryDescriptorQE, queryCams[index])
@@ -496,11 +544,54 @@ def main():
             dist_mat[index,:,2] = distances
 
             #stessa cosa con expansion di query e gallery
-            [distances, rank] = ranker.GQE(queryDescriptorQE, queryCams[index], extGallery=galleryGANDescriptors)
+            #[distances, rank] = ranker.GQE(queryDescriptorQE, queryCams[index], extGallery=galleryGANDescriptors)
+            [distances, rank] = ranker.GQE(queryDescriptorQE, queryCams[index], extGallery=filteredGalleryGANDescriptors)
             dist_mat[index,:,3] = distances
 
-            [distances, rank] = ranker.GQE(queryDescriptorQE, queryCams[index], extGallery=galleryGANDescriptors, weight=weight)
+            #[distances, rank] = ranker.GQE(queryDescriptorQE, queryCams[index], extGallery=galleryGANDescriptors, weight=weight)
+            [distances, rank] = ranker.GQE(queryDescriptorQE, queryCams[index], extGallery=filteredGalleryGANDescriptors, weight=weight)
             dist_mat[index,:,4] = distances
+
+        rankerExtended = Ranker(galleryDescriptors, galleryCams, method, separate_camera_set)
+        dist_mat_extended = np.zeros((N, M, 5))
+
+        #evaluation with fixed weight 
+        fixed_weight = np.array([1.0] + [0.2] * len(ANGLES))
+    
+        for index in tqdm(range(N)):
+            #print("evaluating image " + str(index) + " using " + method + " method ")
+            #print(queryPaths[index])
+            #print(queryGANPaths[index,:])
+            queryDescriptor = queryDescriptors[index,:]
+
+            #Classico senza expansion della query o della gallery
+            #[distances, rank] = ranker.get_dist_rank(queryDescriptors[index,:], queryCams[index], [], [])
+            [distances, rank] = rankerExtended.get_dist_rank(queryDescriptors[index,:], queryCams[index])
+            dist_mat_extended[index,:,0] = distances
+
+            #Calcola la distanza tra l'immagine originale e le immagini generate e prende le tre piu' vicine
+            #filteredQueryGan, _, _ = select_topk_expansions(queryDescriptors[index],queryGANDescriptors[index],k=3)
+
+            queryDescriptorQE = np.concatenate((queryDescriptors[index][None, :], filteredQueryGan),axis=0)
+
+            queryDescriptorQE = np.concatenate((np.expand_dims(queryDescriptor,axis=0),np.squeeze(queryGANDescriptors[index, :, :])))
+
+            #Con expansion della sola query
+            [distances, rank] = rankerExtended.QE(queryDescriptorQE, queryCams[index])
+            dist_mat_extended[index,:,1] = distances
+
+            #puoi anche specificare un peso
+            [distances, rank] = rankerExtended.QE(queryDescriptorQE, queryCams[index], weight=fixed_weight)
+            dist_mat_extended[index,:,2] = distances
+
+            #stessa cosa con expansion di query e gallery
+            [distances, rank] = rankerExtended.GQE(queryDescriptorQE, queryCams[index], extGallery=galleryGANDescriptors)
+            #[distances, rank] = ranker2.GQE(queryDescriptorQE, queryCams[index], extGallery=filteredGalleryGANDescriptors)
+            dist_mat_extended[index,:,3] = distances
+
+            [distances, rank] = rankerExtended.GQE(queryDescriptorQE, queryCams[index], extGallery=galleryGANDescriptors, weight=fixed_weight)
+            #[distances, rank] = ranker2.GQE(queryDescriptorQE, queryCams[index], extGallery=filteredGalleryGANDescriptors, weight=weight)
+            dist_mat_extended[index,:,4] = distances
 
         names = ["Baseline","QE","QE + weight","GQE","GQE + weight"]
 
@@ -511,9 +602,17 @@ def main():
 
         print(method)
 
+        print('\nWeight using distance and top 3 nearest GAN\n')
         for k, name in enumerate(names):
             print(f"\n=== {name} ===")
             evaluate_all(dist_mat[:, :, k], query_ids=queryIds, gallery_ids=galleryIds, query_cams=queryCams, gallery_cams=galleryCams, \
+                cmc_topk=(1, 5, 10, 20), cmc_flag=True, separate_camera_set=separate_camera_set)
+        
+
+        print('\nFixed weight with all gan images\n')
+        for k, name in enumerate(names):
+            print(f"\n=== {name} ===")
+            evaluate_all(dist_mat_extended[:, :, k], query_ids=queryIds, gallery_ids=galleryIds, query_cams=queryCams, gallery_cams=galleryCams, \
                 cmc_topk=(1, 5, 10, 20), cmc_flag=True, separate_camera_set=separate_camera_set)
             
     else:

@@ -44,3 +44,5 @@ def collect_gan_images(
         gan_cams.append(camid)
 
     return gan_paths, gan_ids, gan_cams, gan_list_flat
+
+
